@@ -46,6 +46,12 @@ public abstract class Acara implements Pendaftaran {
         return Collections.unmodifiableList(daftarPeserta);
     }
 
+    // Dipakai DAO untuk mengisi peserta yang sudah tersimpan di database
+    public void muatDaftarPeserta(List<String> peserta) {
+        daftarPeserta.clear();
+        daftarPeserta.addAll(peserta);
+    }
+
     public int getJumlahPendaftar() {
         return daftarPeserta.size();
     }

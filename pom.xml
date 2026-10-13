@@ -10,5 +10,12 @@
         <maven.compiler.release>26</maven.compiler.release>
         <exec.mainClass>main.minpro_3_pbo_sistemmanajemenacara.Minpro_3_PBO_SistemManajemenAcara</exec.mainClass>
     </properties>
-    <name>Minpro_3_PBO_SistemPendaftaranAcara</name>
+    <dependencies>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.4.0</version>
+        </dependency>
+    </dependencies>
+    <name>SistemPendaftaranAcaraSeminar</name>
 </project>

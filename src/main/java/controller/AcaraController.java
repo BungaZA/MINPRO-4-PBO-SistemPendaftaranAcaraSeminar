@@ -1,32 +1,27 @@
 package controller;
 
 import exception.KuotaPenuhException;
-import java.util.ArrayList;
+import java.util.List;
 import model.Acara;
 import model.Seminar;
 import model.Workshop;
+import model.dao.AcaraDAO;
+import model.dao.PendaftaranDAO;
 import util.InputValidator;
 import view.InputHelper;
 import view.MenuView;
 
 public class AcaraController {
-    private final ArrayList<Acara> daftarAcara;
+    private final AcaraDAO acaraDAO;
+    private final PendaftaranDAO pendaftaranDAO;
     private final MenuView view;
     private final InputHelper input;
-    private int nextId;
 
     public AcaraController(MenuView view, InputHelper input) {
         this.view = view;
         this.input = input;
-        this.daftarAcara = new ArrayList<Acara>();
-        this.nextId = 1;
-
-        daftarAcara.add(new Seminar(nextId++, "Inovasi AI dalam Pendidikan",
-                "Dr. Budi Santoso", "2026-10-15", 50, "Teknologi Pendidikan", 0));
-        daftarAcara.add(new Seminar(nextId++, "Cyber Security 2026",
-                "Prof. Dewi Lestari", "2026-10-20", 30, "Keamanan Siber", 50000));
-        daftarAcara.add(new Workshop(nextId++, "Hands-on Docker untuk Pemula",
-                "Andi Wijaya", "2026-10-25", 20, 6, "Laptop dengan Docker"));
+        this.acaraDAO = new AcaraDAO();
+        this.pendaftaranDAO = new PendaftaranDAO();
     }
 
     public void jalankanMenu() {
@@ -43,7 +38,7 @@ public class AcaraController {
                     tambahWorkshop();
                     break;
                 case 3:
-                    view.tampilkanDaftarAcara(daftarAcara);
+                    view.tampilkanDaftarAcara(acaraDAO.ambilSemuaAcara());
                     break;
                 case 4:
                     menuCariAcara();
@@ -73,9 +68,12 @@ public class AcaraController {
         String bidang = input.bacaTeksUmum("Bidang: ", false);
         double biaya = input.bacaBiaya("Biaya (0 = gratis): ", false);
 
-        daftarAcara.add(new Seminar(nextId, nama, pemateri, tanggal, kuota, bidang, biaya));
-        view.pesanSukses("Seminar berhasil ditambahkan dengan ID " + nextId);
-        nextId++;
+        int idBaru = acaraDAO.tambahAcara(new Seminar(0, nama, pemateri, tanggal, kuota, bidang, biaya));
+        if (idBaru > 0) {
+            view.pesanSukses("Seminar berhasil ditambahkan dengan ID " + idBaru);
+        } else {
+            view.pesanError("Seminar gagal disimpan ke database.");
+        }
     }
 
     public void tambahWorkshop() {
@@ -89,31 +87,21 @@ public class AcaraController {
                 + InputValidator.DURASI_MAKSIMAL + "): ", false);
         String alat = input.bacaTeksUmum("Alat: ", false);
 
-        daftarAcara.add(new Workshop(nextId, nama, pemateri, tanggal, kuota, durasi, alat));
-        view.pesanSukses("Workshop berhasil ditambahkan dengan ID " + nextId);
-        nextId++;
+        int idBaru = acaraDAO.tambahAcara(new Workshop(0, nama, pemateri, tanggal, kuota, durasi, alat));
+        if (idBaru > 0) {
+            view.pesanSukses("Workshop berhasil ditambahkan dengan ID " + idBaru);
+        } else {
+            view.pesanError("Workshop gagal disimpan ke database.");
+        }
     }
 
 
     public Acara cariAcara(int id) {
-        for (Acara a : daftarAcara) {
-            if (a.getId() == id) {
-                return a;
-            }
-        }
-        return null;
+        return acaraDAO.cariById(id);
     }
 
-    public ArrayList<Acara> cariAcara(String kataKunci) {
-        ArrayList<Acara> hasil = new ArrayList<Acara>();
-        String kunci = kataKunci.toLowerCase();
-        for (Acara a : daftarAcara) {
-            if (a.getNama().toLowerCase().contains(kunci)
-                    || a.getPemateri().toLowerCase().contains(kunci)) {
-                hasil.add(a);
-            }
-        }
-        return hasil;
+    public List<Acara> cariAcara(String kataKunci) {
+        return acaraDAO.cariByKataKunci(kataKunci);
     }
 
     public void menuCariAcara() {
@@ -131,7 +119,7 @@ public class AcaraController {
             view.tampilkanDetailAcara(acara);
         } else {
             String kataKunci = input.bacaKataKunci("Masukkan kata kunci: ");
-            ArrayList<Acara> hasil = cariAcara(kataKunci);
+            List<Acara> hasil = cariAcara(kataKunci);
             if (hasil.isEmpty()) {
                 view.pesanError("Tidak ada acara dengan kata kunci '" + kataKunci + "'.");
                 return;
@@ -145,7 +133,7 @@ public class AcaraController {
         if (!adaData()) {
             return;
         }
-        view.tampilkanDaftarAcara(daftarAcara);
+        view.tampilkanDaftarAcara(acaraDAO.ambilSemuaAcara());
         int id = input.bacaId("\nMasukkan ID Acara yang akan diupdate: ");
         Acara acara = cariAcara(id);
         if (acara == null) {
@@ -185,7 +173,11 @@ public class AcaraController {
         }
 
         updateDataKhusus(acara);
-        view.pesanSukses("Update selesai.");
+        if (acaraDAO.updateAcara(acara)) {
+            view.pesanSukses("Update selesai.");
+        } else {
+            view.pesanError("Update gagal disimpan ke database.");
+        }
     }
 
     private void updateDataKhusus(Acara acara) {
@@ -217,7 +209,7 @@ public class AcaraController {
         if (!adaData()) {
             return;
         }
-        view.tampilkanDaftarAcara(daftarAcara);
+        view.tampilkanDaftarAcara(acaraDAO.ambilSemuaAcara());
         int id = input.bacaId("\nMasukkan ID Acara yang akan dihapus: ");
         Acara acara = cariAcara(id);
         if (acara == null) {
@@ -230,8 +222,11 @@ public class AcaraController {
                     + acara.getJumlahPendaftar() + " peserta.");
         }
         if (input.bacaKonfirmasi("Yakin ingin menghapus '" + acara.getNama() + "'? (y/n): ")) {
-            daftarAcara.remove(acara);
-            view.pesanSukses("Acara berhasil dihapus.");
+            if (acaraDAO.hapusAcara(acara.getId())) {
+                view.pesanSukses("Acara berhasil dihapus.");
+            } else {
+                view.pesanError("Acara gagal dihapus dari database.");
+            }
         } else {
             view.pesanInfo("Penghapusan dibatalkan.");
         }
@@ -242,7 +237,7 @@ public class AcaraController {
         if (!adaData()) {
             return;
         }
-        view.tampilkanDaftarAcara(daftarAcara);
+        view.tampilkanDaftarAcara(acaraDAO.ambilSemuaAcara());
         int id = input.bacaId("\nMasukkan ID Acara yang ingin diikuti: ");
         Acara acara = cariAcara(id);
         if (acara == null) {
@@ -263,19 +258,24 @@ public class AcaraController {
             }
             String email = input.bacaEmail("Email (opsional, Enter untuk lewati): ", true);
 
+            // tambahPeserta memeriksa kuota di model, lalu disimpan ke database lewat DAO
             if (email == null) {
                 acara.tambahPeserta(nama);
             } else {
                 acara.tambahPeserta(nama, email);
             }
-            view.tampilkanStruk(acara, nama);
+            if (pendaftaranDAO.tambahPendaftaran(acara.getId(), nama, email)) {
+                view.tampilkanStruk(acara, nama);
+            } else {
+                view.pesanError("Pendaftaran gagal disimpan ke database.");
+            }
         } catch (KuotaPenuhException e) {
             view.pesanError(e.getMessage());
         }
     }
 
     private boolean adaData() {
-        if (daftarAcara.isEmpty()) {
+        if (acaraDAO.ambilSemuaAcara().isEmpty()) {
             view.pesanError("Belum ada acara yang terdaftar.");
             return false;
         }
