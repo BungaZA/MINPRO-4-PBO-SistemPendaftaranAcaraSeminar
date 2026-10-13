@@ -18,39 +18,40 @@ Program ini membantu pengelola mencatat dan mengatur acara. Fitur yang tersedia:
 
 Semua data tersimpan permanen di database `db_manajemen_acara`. Data awal (3 acara dan 2 peserta).
 
-Perubahan utama dibanding Mini Project 2:
+Perubahan dengan Mini Project 3:
 
-| Aspek | Mini Project 2 | Mini Project 3 |
+| Aspek | Mini Project 3 | Mini Project 4 |
 |---|---|---|
-| Struktur | Satu package `seminar` | MVC: `model`, `view`, `controller`, ditambah `exception` dan `util` |
-| `Acara` | Class biasa | `abstract class` dengan 3 abstract method |
-| Overriding | `getJenis()` dan `getInfoTambahan()` di-override tetapi tidak berdampak apa-apa | Semua method override dipakai nyata (tampilan daftar, detail, dan struk biaya) |
-| Overloading | Tidak ada | `cariAcara`, `tambahPeserta`, `tampilkanDaftarAcara` |
-| Atribut tetap | Semua bisa diubah | Atribut yang tidak berubah dibuat `final` |
-| Validasi | Dicek setelah semua input terisi | Dicek langsung per field, diulang sampai benar |
-| Aturan biaya | Biaya Rp1 lolos | Gratis (0) atau Rp10.000 sampai Rp5.000.000 |
-| Nilai tambah | Polymorphism | Interface dan custom exception |
+| Penyimpanan data | `ArrayList<Acara>` di memori, hilang saat program ditutup | Database MySQL, data tetap ada |
+| Data awal | Di-`add` di constructor `AcaraController` | Di file `.sql` (`INSERT INTO ...`) |
+| ID acara | Dihitung manual dengan `nextId` | `AUTO_INCREMENT` di database |
+| Akses data | Langsung ke `ArrayList` di controller | Lewat class DAO (`AcaraDAO`, `PendaftaranDAO`) |
+| Package | `main`, `model`, `view`, `controller`, `exception`, `util` | Ditambah `config` dan `model.dao` |
+| Query | Tidak ada | Semua memakai `PreparedStatement` |
+| Penyimpanan peserta | `ArrayList<String>` di dalam objek | Tabel `pendaftaran` |
 
 ---
 
 ## 2. Struktur Package
 
 
-
-<img width="340" height="412" alt="Screenshot 2026-10-08 200017" src="https://github.com/user-attachments/assets/65c48346-b470-4193-8b24-4901aa94bdb3" />
+<img width="288" height="484" alt="Screenshot 2026-10-13 222821" src="https://github.com/user-attachments/assets/bd0ebda4-0e59-4282-9045-b86a0f3577fb" />
 
 
 | Package | Isi | Tanggung jawab |
 |---|---|---|
-| `main` | `Main` | Titik masuk program. Merakit View, input, dan Controller, lalu menjalankan menu |
-| `model` | `Acara`, `Seminar`, `Workshop`, `Pendaftaran` | Menyimpan data dan aturan objek (misalnya cara menghitung biaya). Tidak ada `Scanner` ataupun `println` |
+| `config` | `Koneksi`, `TesKoneksi` | `Koneksi` membuat dan menyediakan koneksi ke database. `TesKoneksi` dipakai untuk mengecek koneksi berhasil atau tidak |
+| `main` | `Main` | Titik masuk program. Mengecek koneksi database, lalu merakit View, input, dan Controller |
+| `model` | `Acara`, `Seminar`, `Workshop`, `Pendaftaran` | Menyimpan data dan aturan objek (misalnya cara menghitung biaya dan pengecekan kuota). Tidak ada `Scanner`, `println`, ataupun kode SQL |
+| `model.dao` | `AcaraDAO`, `PendaftaranDAO` | Satu-satunya tempat kode SQL. Mengubah objek model menjadi data tabel dan sebaliknya |
 | `view` | `MenuView`, `InputHelper` | `MenuView` menampilkan semua teks ke layar. `InputHelper` membaca input dan memvalidasinya seketika |
-| `controller` | `AcaraController` | Mengatur jalannya program: menerima pilihan menu, mengambil input, mengolah data lewat model, lalu meminta View menampilkan hasil |
+| `controller` | `AcaraController` | Mengatur jalannya program: menerima pilihan menu, mengambil input, memanggil DAO dan model, lalu meminta View menampilkan hasil |
 | `exception` | `KuotaPenuhException` | Exception khusus untuk pendaftaran ke acara yang kuotanya sudah penuh |
 | `util` | `InputValidator`, `FormatUtil` | Aturan validasi dan format rupiah |
 
+### 2.1 Database
 
-Catatan: `InputHelper` berada di package `view` karena tugasnya berurusan langsung dengan pengguna. Controller memanggilnya untuk mengambil data dan tidak mencetak apa pun sendiri.
+Database `db_manajemen_acara` terdiri dari 4 tabel. Tabel `seminar` dan `workshop` adalah tabel detail yang terhubung ke `acara` lewat `acara_id` (mengikuti hubungan inheritance di kode: `Seminar` dan `Workshop` adalah turunan `Acara`).
 
 ---
 
@@ -58,17 +59,15 @@ Catatan: `InputHelper` berada di package `view` karena tugasnya berurusan langsu
 
 ### 3.1 Alur Umum
 
-1. `Main.main()` membuat `InputHelper` (membungkus `Scanner`), `MenuView`, lalu `AcaraController`.
-2. `MenuView` menampilkan banner program.
-3. Constructor `AcaraController` menyiapkan `ArrayList<Acara>` dan mengisi 3 data awal.
+1. `Main.main()` membuat `InputHelper` (membungkus `Scanner`) dan `MenuView`, lalu menampilkan banner.
+2. `Main` memanggil `Koneksi.getConnection()`. Jika hasilnya `null`, program menampilkan pesan error dan berhenti.
+3. `AcaraController` dibuat. Constructor-nya membuat `AcaraDAO` dan `PendaftaranDAO`. **Tidak ada lagi data yang diisi lewat kode**.
 4. `jalankanMenu()` masuk ke perulangan menu. Setiap putaran: tampilkan menu, baca pilihan 0 sampai 7 lewat `InputHelper`, lalu jalankan method yang sesuai lewat `switch`.
 5. Perulangan berhenti saat pengguna memilih `0`. View menampilkan pesan penutup dan `Scanner` ditutup.
 
 ### 3.2 Alur Validasi Input (berlaku di semua menu)
 
-Setiap field divalidasi saat itu juga, tidak menunggu semua field terisi:
-
-Aturan validasi:
+Setiap field divalidasi saat itu juga di `InputHelper` dan `InputValidator`, sebelum data dikirim ke DAO. Input yang salah diminta ulang sampai benar.
 
 | Field | Aturan |
 |---|---|
@@ -80,8 +79,8 @@ Aturan validasi:
 | Tanggal | Format `YYYY-MM-DD`, tanggalnya harus benar-benar ada (misal 2026-02-30 ditolak), dan tidak boleh sebelum hari ini |
 | Kuota | 1 sampai 500 |
 | Durasi workshop | 1 sampai 12 jam |
-| Biaya seminar | `0` (gratis) atau Rp10.000 sampai Rp5.000.000. Nilai seperti Rp1 ditolak |
-| Email (opsional) | Format email yang valid |
+| Biaya seminar | `0` (gratis) atau Rp10.000 sampai Rp5.000.000 |
+| Email (opsional) | Format email yang valid; jika dikosongkan, disimpan sebagai `NULL` di database |
 | Konfirmasi hapus | Hanya `y` atau `n` |
 | Kuota saat update | Tidak boleh lebih kecil dari jumlah peserta yang sudah mendaftar |
 | Nama peserta | Tidak boleh sama dengan peserta lain di acara yang sama |
@@ -98,19 +97,27 @@ Aturan validasi:
 | 6 | Hapus Acara | Pilih ID, tampilkan peringatan jika sudah ada peserta, lalu minta konfirmasi `y/n` |
 | 7 | Daftar Peserta | Pilih ID, cek kuota (jika penuh langsung ditolak), input nama (cek duplikat), email opsional, lalu tampilkan struk berisi nama, acara, biaya, dan sisa kuota |
 
-Jika data acara kosong, menu Update, Hapus, dan Daftar Peserta langsung memberi tahu dan kembali ke menu.
+Jika tidak ada data acara di database, menu Update, Hapus, dan Daftar Peserta langsung memberi tahu dan kembali ke menu.
 
 ### 3.4 Tampilan Output
+
+**Tes koneksi database**
+
+![Tes koneksi](screenshots/tes-koneksi.png)
+
+**Data awal di database (phpMyAdmin / MySQL)**
+
+![Data awal database](screenshots/data-awal-database.png)
 
 **Menu utama**
 
 <img width="318" height="226" alt="Screenshot 2026-10-08 201704" src="https://github.com/user-attachments/assets/d276289e-77bf-444a-8ccd-a509e2bef8c7" />
 
-**Lihat daftar acara** (biaya tiap jenis acara dihitung dengan cara berbeda)
+**Lihat daftar acara**
 
 <img width="884" height="255" alt="Screenshot 2026-10-08 201754" src="https://github.com/user-attachments/assets/3cf806f9-296a-4d25-bb50-c5641f00c1c4" />
 
-**Tambah seminar dengan validasi langsung** (tanggal lampau, kuota di luar rentang, dan biaya Rp1 ditolak seketika)
+**Tambah seminar dengan validasi langsung** 
 
 <img width="611" height="260" alt="Screenshot 2026-10-08 202056" src="https://github.com/user-attachments/assets/a1aec6ad-505b-4729-81bf-ff3c7d58c443" />
 
@@ -126,7 +133,7 @@ Jika data acara kosong, menu Update, Hapus, dan Daftar Peserta langsung memberi 
 
 <img width="730" height="190" alt="Screenshot 2026-10-08 202401" src="https://github.com/user-attachments/assets/02f2091f-cd95-41f7-9500-dc96f5af47b9" />
 
-**Update acara dengan input salah lalu diperbaiki**
+**Update acara**
 
 <img width="740" height="214" alt="Screenshot 2026-10-08 202620" src="https://github.com/user-attachments/assets/8b77d936-f684-4a70-b9f7-3bce5a424c0f" />
 
@@ -141,6 +148,10 @@ Jika data acara kosong, menu Update, Hapus, dan Daftar Peserta langsung memberi 
 **Daftar peserta ditolak (nama duplikatm)**
 
 <img width="399" height="181" alt="Screenshot 2026-10-08 203053" src="https://github.com/user-attachments/assets/a7bb640f-f835-4acf-bd50-6eacb2dc7e74" />
+
+**Data tersimpan di database setelah operasi CRUD**
+
+![Hasil di database](screenshots/hasil-database.png)
 
 ---
 
@@ -158,29 +169,23 @@ Semua atribut pada `Acara`, `Seminar`, dan `Workshop` bersifat `private` dan han
   private final ArrayList<String> daftarPeserta;
   ```
 
-  `setId()` dan `setDaftarPeserta()` dihapus karena tidak lagi dibutuhkan.
-
 - **Getter yang aman.** `getDaftarPeserta()` mengembalikan list read-only (`Collections.unmodifiableList`), sehingga kode di luar tidak bisa menambah atau menghapus peserta tanpa melewati method `tambahPeserta()`.
 - **Setter yang menjaga aturan.** `setKuota()` melempar `IllegalArgumentException` jika kuota baru lebih kecil dari jumlah peserta.
-- **Konstanta `static final`** untuk batas validasi (`KUOTA_MAKSIMAL`, `BIAYA_MINIMAL`, dll.) di `InputValidator`, serta `BIAYA_MATERI` dan `TARIF_PER_JAM` di `Workshop`.
-- **Referensi `final`** pada `daftarAcara`, `view`, dan `input` di `AcaraController`, serta `scanner` di `InputHelper`. `InputValidator` dan `FormatUtil` juga dibuat `final class` dengan constructor `private` karena hanya berisi method static.
+- **Method khusus untuk DAO.** Peserta yang sudah tersimpan di database dimasukkan ke objek lewat `muatDaftarPeserta(List<String>)`, bukan dengan membuka akses langsung ke list.
+- **Konstanta `static final`** untuk batas validasi di `InputValidator`, serta `BIAYA_MATERI` dan `TARIF_PER_JAM` di `Workshop`.
+- **Pembungkusan akses database.** Di `Koneksi`, `URL`, `USER`, `PASS`, dan `conn` bersifat `private static final` / `private static`; kode lain hanya bisa memakai `getConnection()`. Di DAO, `conn` dan `pendaftaranDAO` bersifat `private final`, dan method bantu seperti `petakanKeAcara()` dan `simpanDetail()` bersifat `private`.
+- **Referensi `final`** pada `acaraDAO`, `pendaftaranDAO`, `view`, dan `input` di `AcaraController`. `InputValidator` dan `FormatUtil` dibuat `final class` dengan constructor `private` karena hanya berisi method static.
 
-Atribut seperti `nama`, `pemateri`, `tanggal`, dan `kuota` sengaja tidak dibuat `final` karena memang bisa diubah lewat menu Update. Begitu juga `nextId` yang terus bertambah.
+Atribut seperti `nama`, `pemateri`, `tanggal`, dan `kuota` sengaja tidak dibuat `final` karena memang bisa diubah lewat menu Update.
 
 ### 4.2 Inheritance
-
-```
-          Acara (abstract)
-         /               \
-    Seminar             Workshop
-```
 
 `Seminar` dan `Workshop` memakai `extends Acara` dan memanggil `super(...)` untuk mengisi atribut umum (id, nama, pemateri, tanggal, kuota). Masing-masing hanya menambah atribut miliknya sendiri:
 
 - `Seminar`: `bidang`, `biaya`
 - `Workshop`: `durasiJam`, `alat`
 
-Karena itu `ArrayList<Acara>` bisa menampung kedua jenis objek sekaligus.
+Hubungan ini juga tercermin di database: kolom umum ada di tabel `acara`, sedangkan kolom khusus ada di tabel `seminar` dan `workshop`. Karena itu `AcaraDAO` bisa mengembalikan `List<Acara>` yang berisi kedua jenis objek sekaligus.
 
 ---
 
@@ -196,7 +201,7 @@ public abstract String getInfoTambahan();
 public abstract double hitungBiayaPendaftaran();
 ```
 
-Dengan cara ini, setiap jenis acara dipaksa menjelaskan sendiri jenisnya, informasi khususnya, dan cara menghitung biayanya.
+Setiap jenis acara dipaksa menjelaskan sendiri jenisnya, informasi khususnya, dan cara menghitung biayanya.
 
 ### 5.2 Polymorphism: Overriding
 
@@ -204,60 +209,90 @@ Dengan cara ini, setiap jenis acara dipaksa menjelaskan sendiri jenisnya, inform
 |---|---|---|
 | `getJenis()` | `"Seminar"` | `"Workshop"` |
 | `getInfoTambahan()` | `Bidang: ...` | `Durasi: ... jam \| Alat: ...` |
-| `hitungBiayaPendaftaran()` | `biaya` (sesuai input) | `BIAYA_MATERI + (TARIF_PER_JAM × durasiJam)` |
+| `hitungBiayaPendaftaran()` | `biaya` (dari database) | `BIAYA_MATERI + (TARIF_PER_JAM × durasiJam)` |
 | `toString()` | data umum + info bidang | data umum + info durasi dan alat |
 
-Seluruh method di atas benar-benar dipanggil lewat referensi bertipe `Acara`, yaitu di:
+Method di atas dipanggil lewat referensi bertipe `Acara`, yaitu di `MenuView.tampilkanDaftarAcara()`, `tampilkanDetailAcara()`, dan `tampilkanStruk()`.
 
-- `MenuView.tampilkanDaftarAcara()`: loop `ArrayList<Acara>` yang memanggil `toString()` dan `hitungBiayaPendaftaran()`.
-- `MenuView.tampilkanDetailAcara()`: menampilkan detail acara hasil pencarian.
-- `MenuView.tampilkanStruk()`: memanggil `getJenis()` dan `hitungBiayaPendaftaran()` pada struk pendaftaran.
+Polymorphism juga muncul saat membaca database. `AcaraDAO.petakanKeAcara()` membaca satu baris hasil query lalu membuat objek `Seminar` atau `Workshop` sesuai kolom `tipe_acara`, tetapi dikembalikan sebagai tipe `Acara`:
 
 ```java
-for (Acara a : daftar) {
-    System.out.println(a);  // toString() milik Seminar atau Workshop
-    System.out.println("   Biaya Pendaftaran: "
-            + FormatUtil.rupiah(a.hitungBiayaPendaftaran()));  // versi sesuai objek asli
+private Acara petakanKeAcara(ResultSet rs) throws SQLException {
+    // ...
+    if ("Workshop".equals(rs.getString("tipe_acara"))) {
+        return new Workshop(id, nama, pemateri, tanggal, kuota,
+                rs.getInt("durasi_jam"), rs.getString("alat"));
+    }
+    return new Seminar(id, nama, pemateri, tanggal, kuota,
+            rs.getString("bidang"), rs.getDouble("biaya"));
 }
 ```
 
-Contoh hasilnya: Seminar "Cyber Security 2026" menampilkan Rp50.000 (dari input), sedangkan Workshop 6 jam menampilkan Rp145.000 (25.000 + 6 × 20.000).
+Dengan begitu, controller dan view cukup bekerja dengan `List<Acara>` tanpa perlu tahu jenis aslinya. Saat menyimpan, `tipe_acara` diisi dari `acara.getJenis()`.
 
 ### 5.3 Polymorphism: Overloading
 
 | Class | Method | Perbedaan |
 |---|---|---|
-| `AcaraController` | `cariAcara(int id)` | Mengembalikan satu `Acara` berdasarkan ID |
-| `AcaraController` | `cariAcara(String kataKunci)` | Mengembalikan daftar `Acara` yang nama atau pematerinya mengandung kata kunci |
+| `AcaraController` | `cariAcara(int id)` | Mengembalikan satu `Acara` berdasarkan ID (memanggil `AcaraDAO.cariById`) |
+| `AcaraController` | `cariAcara(String kataKunci)` | Mengembalikan daftar `Acara` yang nama atau pematerinya mengandung kata kunci (memanggil `AcaraDAO.cariByKataKunci`) |
 | `Acara` | `tambahPeserta(String nama)` | Mendaftarkan peserta tanpa email |
 | `Acara` | `tambahPeserta(String nama, String email)` | Mendaftarkan peserta beserta email |
 | `MenuView` | `tampilkanDaftarAcara(List)` | Menampilkan daftar dengan judul bawaan |
 | `MenuView` | `tampilkanDaftarAcara(String judul, List)` | Menampilkan daftar dengan judul sendiri (dipakai untuk hasil pencarian) |
 
-Kedua versi `cariAcara` dipakai di menu Cari Acara. Kedua versi `tambahPeserta` dipakai di menu Daftar Peserta, tergantung apakah pengguna mengisi email atau tidak.
-
 ---
 
-## 6. Penerapan Nilai Tambah
+## 6. Penerapan JDBC
 
-### 6.1 Interface
+### 6.1 Koneksi (`config/Koneksi.java`)
 
-Interface `Pendaftaran` berada di `model/Pendaftaran.java` dan berisi kontrak pendaftaran peserta:
+`Koneksi` memakai `DriverManager.getConnection()` dengan URL `jdbc:mysql://localhost:3306/db_manajemen_acara`. Koneksi disimpan di satu variabel `static`, sehingga hanya dibuat sekali dan dipakai ulang oleh semua DAO. Jika koneksi belum ada atau sudah tertutup, koneksi baru dibuat. Jika gagal, pesan error ditampilkan dan `null` dikembalikan, lalu `Main` menghentikan program dengan pesan yang jelas.
+
+Driver MySQL ditambahkan di `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <version>8.3.0</version>
+</dependency>
+```
+
+### 6.2 Prepared Statement
+
+Semua query memakai `PreparedStatement` dengan tanda `?` dan `setXxx()`, tidak ada penggabungan string untuk nilai input. Ini mencegah SQL injection dan menangani tipe data dengan benar. Setiap `PreparedStatement` dan `ResultSet` dibuka dengan **try-with-resources** sehingga otomatis ditutup.
 
 ```java
-public interface Pendaftaran {
-    void tambahPeserta(String namaPeserta) throws KuotaPenuhException;
-    boolean isKuotaPenuh();
-    int getSisaKuota();
+String sql = "UPDATE acara SET nama_acara=?, pemateri=?, tanggal=?, kuota=? WHERE id=?";
+try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+    pstmt.setString(1, acara.getNama());
+    pstmt.setString(2, acara.getPemateri());
+    pstmt.setDate(3, java.sql.Date.valueOf(acara.getTanggal()));
+    pstmt.setInt(4, acara.getKuota());
+    pstmt.setInt(5, acara.getId());
+    pstmt.executeUpdate();
 }
 ```
 
-`Acara` mengimplementasikannya (`abstract class Acara implements Pendaftaran`) sehingga aturan pendaftaran terpisah dari data acara dan diwariskan ke `Seminar` dan `Workshop`.
+### 6.3 DAO (Data Access Object)
 
-### 6.2 Custom Exception
+| DAO | Method | Operasi | Tabel |
+|---|---|---|---|
+| `AcaraDAO` | `tambahAcara(Acara)` | CREATE (mengembalikan ID baru, atau -1 jika gagal) | `acara` + `seminar`/`workshop` |
+| `AcaraDAO` | `ambilSemuaAcara()` | READ semua | `acara` LEFT JOIN `seminar`, `workshop` |
+| `AcaraDAO` | `cariById(int)` | READ satu | sama seperti di atas, `WHERE a.id = ?` |
+| `AcaraDAO` | `cariByKataKunci(String)` | READ pencarian | `WHERE LOWER(nama_acara) LIKE ? OR LOWER(pemateri) LIKE ?` |
+| `AcaraDAO` | `updateAcara(Acara)` | UPDATE | `acara` + `seminar`/`workshop` |
+| `AcaraDAO` | `hapusAcara(int)` | DELETE | `acara` (tabel lain ikut terhapus lewat cascade) |
+| `PendaftaranDAO` | `tambahPendaftaran(int, String, String)` | CREATE | `pendaftaran` |
+| `PendaftaranDAO` | `ambilPesertaByAcara(int)` | READ | `pendaftaran` |
+| `PendaftaranDAO` | `hapusPendaftaran(int, String)` | DELETE | `pendaftaran` |
 
-`KuotaPenuhException` (package `exception`) dilempar oleh `Acara.pastikanKuotaTersedia()` ketika kuota sudah penuh. Exception ditangkap di `AcaraController.daftarPeserta()` lalu pesannya ditampilkan lewat View.
+Hal penting dalam implementasinya:
 
-### 6.3 Validasi dan Error Handling yang Diperketat
+- **Satu `SELECT` dengan `LEFT JOIN`** mengambil data umum dan data khusus sekaligus. `AcaraDAO` lalu memetakan tiap baris menjadi `Seminar` atau `Workshop` dan memuat pesertanya lewat `PendaftaranDAO`.
+- **Konversi tanggal.** Di model tanggal berupa `String` (`yyyy-MM-dd`), sedangkan di database bertipe `DATE`. Saat menyimpan dipakai `java.sql.Date.valueOf(...)`, saat membaca dipakai `rs.getDate(...).toString()`.
+- **Email opsional.** `pstmt.setString(3, email)` dengan `email = null` disimpan sebagai `NULL`. Saat dibaca, peserta tanpa email ditampilkan hanya dengan namanya.
+- **Penanganan error.** `SQLException` ditangkap di DAO. Method tulis mengembalikan `boolean` (atau ID) sehingga controller bisa menampilkan pesan sukses atau gagal lewat View.
 
-Penjelasannya ada di bagian 3.2. Semua aturan ada di `InputValidator`, dan pembacaan input berulang di `InputHelper`.
