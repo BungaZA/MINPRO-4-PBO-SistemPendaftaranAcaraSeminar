@@ -101,14 +101,6 @@ Jika tidak ada data acara di database, menu Update, Hapus, dan Daftar Peserta la
 
 ### 3.4 Tampilan Output
 
-**Tes koneksi database**
-
-![Tes koneksi](screenshots/tes-koneksi.png)
-
-**Data awal di database (phpMyAdmin / MySQL)**
-
-![Data awal database](screenshots/data-awal-database.png)
-
 **Menu utama**
 
 <img width="318" height="226" alt="Screenshot 2026-10-08 201704" src="https://github.com/user-attachments/assets/d276289e-77bf-444a-8ccd-a509e2bef8c7" />
@@ -151,7 +143,9 @@ Jika tidak ada data acara di database, menu Update, Hapus, dan Daftar Peserta la
 
 **Data tersimpan di database setelah operasi CRUD**
 
-![Hasil di database](screenshots/hasil-database.png)
+<img width="620" height="239" alt="Screenshot 2026-10-13 230802" src="https://github.com/user-attachments/assets/de347faf-1484-45ea-8faf-89d5e813eece" />
+
+<img width="764" height="199" alt="Screenshot 2026-10-13 230812" src="https://github.com/user-attachments/assets/133a85ef-1f7c-4f1e-86ab-2dd6a4f636d6" />
 
 ---
 
